@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>رادار الإشارات الذكي</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0d1117; color: white; text-align: center; margin: 0; padding: 20px; }
+        .card { background: #161b22; border: 1px solid #30363d; padding: 30px; border-radius: 15px; margin-top: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .status { font-size: 14px; color: #8b949e; margin-bottom: 20px; }
+        .signal-btn { font-size: 28px; font-weight: bold; padding: 20px; border-radius: 10px; display: none; margin-top: 20px; animation: pulse 1.5s infinite; }
+        .call { background-color: #238636; color: white; }
+        .put { background-color: #da3633; color: white; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>📡 رادار المؤشرات والشموع (1m)</h2>
+    <div class="status">حالة السيرفر: <span id="status">جاري الاتصال...</span></div>
+    <div id="signal" class="signal-btn"></div>
+    <div id="info" style="margin-top: 20px; font-size: 18px; line-height: 1.6;">يرجى إبقاء هذه الصفحة مفتوحة بجانب منصة التداول.</div>
+</div>
+<audio id="sound" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" preload="auto"></audio>
+<script>
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/signals`);
+    ws.onopen = () => { document.getElementById("status").innerText = "نشط ويراقب السوق 🟢"; document.getElementById("status").style.color = "#238636"; };
+    ws.onclose = () => { document.getElementById("status").innerText = "منقطع 🔴"; document.getElementById("status").style.color = "#da3633"; };
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        const signalDiv = document.getElementById("signal");
+        const infoDiv = document.getElementById("info");
+        if(data.action !== "HOLD") {
+            try { document.getElementById("sound").play(); } catch(e){}
+            signalDiv.style.display = "block";
+            signalDiv.className = `signal-btn ${data.action.toLowerCase()}`;
+            signalDiv.innerText = data.action === "CALL" ? "🟢 شراء (CALL)" : "🔴 بيع (PUT)";
+            infoDiv.innerHTML = `<b>الزوج:</b> ${data.asset} <br><b>السعر:</b> ${data.price} <br><b>الوقت:</b> ${data.time}`;
+        }
+    };
+</script>
+</body>
+</html>
