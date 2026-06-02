@@ -3,42 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>رادار الإشارات الذكي</title>
+    <title>رادار إشارات EURUSD الحي</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0d1117; color: white; text-align: center; margin: 0; padding: 20px; }
-        .card { background: #161b22; border: 1px solid #30363d; padding: 30px; border-radius: 15px; margin-top: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .status { font-size: 14px; color: #8b949e; margin-bottom: 20px; }
-        .signal-btn { font-size: 28px; font-weight: bold; padding: 20px; border-radius: 10px; display: none; margin-top: 20px; animation: pulse 1.5s infinite; }
-        .call { background-color: #238636; color: white; }
-        .put { background-color: #da3633; color: white; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
+        body {
+            background-color: #0b0e11;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 400px;
+            margin: 50px auto;
+            background: #151a21;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        h1 { font-size: 24px; margin-bottom: 20px; color: #f0b90b; }
+        .status { font-size: 14px; color: #00ffcc; margin-bottom: 30px; }
+        .signal-box {
+            font-size: 48px;
+            font-weight: bold;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            background: #1e2530;
+        }
+        .HOLD { color: #848e9c; }
+        .CALL { color: #02c076; animation: pulse 1s infinite; }
+        .PUT { color: #f84960; animation: pulse 1s infinite; }
+        .info { font-size: 16px; margin: 10px 0; color: #eaeaea; }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
     </style>
 </head>
 <body>
-<div class="card">
-    <h2>📡 رادار المؤشرات والشموع (1m)</h2>
-    <div class="status">حالة السيرفر: <span id="status">جاري الاتصال...</span></div>
-    <div id="signal" class="signal-btn"></div>
-    <div id="info" style="margin-top: 20px; font-size: 18px; line-height: 1.6;">يرجى إبقاء هذه الصفحة مفتوحة بجانب منصة التداول.</div>
-</div>
-<audio id="sound" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" preload="auto"></audio>
-<script>
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/signals`);
-    ws.onopen = () => { document.getElementById("status").innerText = "نشط ويراقب السوق 🟢"; document.getElementById("status").style.color = "#238636"; };
-    ws.onclose = () => { document.getElementById("status").innerText = "منقطع 🔴"; document.getElementById("status").style.color = "#da3633"; };
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        const signalDiv = document.getElementById("signal");
-        const infoDiv = document.getElementById("info");
-        if(data.action !== "HOLD") {
-            try { document.getElementById("sound").play(); } catch(e){}
-            signalDiv.style.display = "block";
-            signalDiv.className = `signal-btn ${data.action.toLowerCase()}`;
-            signalDiv.innerText = data.action === "CALL" ? "🟢 شراء (CALL)" : "🔴 بيع (PUT)";
-            infoDiv.innerHTML = `<b>الزوج:</b> ${data.asset} <br><b>السعر:</b> ${data.price} <br><b>الوقت:</b> ${data.time}`;
-        }
-    };
-</script>
+
+    <div class="container">
+        <h1>رادار إشارات EURUSD</h1>
+        <div class="status" id="status">جاري الاتصال بالسيرفر... ⏳</div>
+        
+        <div id="signal" class="signal-box HOLD">HOLD</div>
+        
+        <div class="info">السعر الحالي: <span id="price" style="color:#f0b90b;">0.00000</span></div>
+        <div class="info">مؤشر RSI: <span id="rsi">50</span></div>
+        <div class="info">وقت التحديث: <span id="time" style="color:#848e9c;">00:00:00</span></div>
+    </div>
+
+    <audio id="alert-sound" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
+
+    <script>
+        // الاتصال التلقائي بسيرفر الـ WebSockets المشغل على Render
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = protocol + window.location.host + '/ws/signals';
+        let socket = new WebSocket(wsUrl);
+        
+        const audio = document.getElementById('alert-sound');
+
+        socket.onopen = () => {
+            document.getElementById('status').innerText = "نشط ويراقب السوق الحقيقي 🟢";
+        };
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            const signalDiv = document.getElementById('signal');
+            signalDiv.innerText = data.action;
+            signalDiv.className = "signal-box " + data.action;
+            
+            document.getElementById('price').innerText = data.price;
+            document.getElementById('rsi').innerText = data.rsi;
+            document.getElementById('time').innerText = data.time;
+            
+            // تشغيل الصوت فوراً إذا كانت الإشارة دخول (صعود أو هبوط) وليست انتظار
+            if (data.action === "CALL" || data.action === "PUT") {
+                audio.play().catch(e => console.log("Audio play blocked"));
+            }
+        };
+
+        socket.onclose = () => {
+            document.getElementById('status').innerText = "انقطع الاتصال، جاري إعادة المحاولة... 🔴";
+            setTimeout(() => { location.reload(); }, 5000);
+        };
+    </script>
 </body>
 </html>
