@@ -3,18 +3,23 @@ from fastapi.responses import HTMLResponse
 import asyncio
 import json
 import datetime
-from tradingview_ta import TA_Handler, Interval
+import os
 
 app = FastAPI()
 connected_clients = []
 
-# إعداد الاتصال بـ TradingView لسحب بيانات EURUSD الحية
-handler = TA_Handler(
-    screen="forex",
-    exchange="FX_IDC",
-    symbol="EURUSD",
-    interval=Interval.INTERVAL_1_MINUTE  # التحليل على فريم الدقيقة
-)
+# تفعيل مكتبة التداول بحذر لتفادي أخطاء التشغيل
+try:
+    from tradingview_ta import TA_Handler, Interval
+    handler = TA_Handler(
+        screen="forex",
+        exchange="FX_IDC",
+        symbol="EURUSD",
+        interval=Interval.INTERVAL_1_MINUTE
+    )
+except Exception as e:
+    print(f"CRITICAL ERROR IMPORTING TRADINGVIEW: {e}")
+    handler = None
 
 @app.websocket("/ws/signals")
 async def websocket_endpoint(websocket: WebSocket):
@@ -27,25 +32,31 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/")
 async def get_index():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read(), status_code=200)
+    # التأكد من وجود الملف لمنع توقف السيرفر
+    if os.path.exists("index.html"):
+        with open("index.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), status_code=200)
+    return HTMLResponse(content="<h1>ملف index.html غير موجود في المستودع الرئيسي!</h1>", status_code=404)
 
 async def check_market_loop():
     while True:
         try:
-            # جلب التحليل الفني والمؤشرات من قلب السوق مباشرة
-            analysis = handler.get_analysis()
-            rsi = analysis.indicators.get("RSI", 50)
-            close = analysis.indicators.get("close", 0)
-            upper_band = analysis.indicators.get("BB.upper", 0)
-            lower_band = analysis.indicators.get("BB.lower", 0)
-            
-            # خوارزمية اتخاذ القرار (الاستراتيجية الرقمية)
-            action = "HOLD"
-            if close <= lower_band or rsi < 30:
-                action = "CALL"  # إشارة صعود (شراء)
-            elif close >= upper_band or rsi > 70:
-                action = "PUT"   # إشارة هبوط (بيع)
+            if handler:
+                analysis = handler.get_analysis()
+                rsi = analysis.indicators.get("RSI", 50)
+                close = analysis.indicators.get("close", 0)
+                upper_band = analysis.indicators.get("BB.upper", 0)
+                lower_band = analysis.indicators.get("BB.lower", 0)
+                
+                action = "HOLD"
+                if close <= lower_band or rsi < 30:
+                    action = "CALL"
+                elif close >= upper_band or rsi > 70:
+                    action = "PUT"
+            else:
+                # وضع احتياطي في حال فشل الاتصال بـ TradingView
+                action = "HOLD"
+                close, rsi = 0.0, 50.0
 
             now = datetime.datetime.now().strftime("%H:%M:%S")
             signal_data = {
@@ -56,14 +67,12 @@ async def check_market_loop():
                 "time": now
             }
             
-            # بث الإشارة الحية إلى شاشة هاتفكِ فوراً
             for client in connected_clients:
                 await client.send_text(json.dumps(signal_data))
                 
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error fetching data loop: {e}")
             
-        # فحص السوق يتكرر تلقائياً كل 15 ثانية لملاحقة الشموع
         await asyncio.sleep(15)
 
 @app.on_event("startup")
